@@ -1,5 +1,52 @@
 <!DOCTYPE html>
-<html>
-  <head><title>TeslaDock</title></head>
-  <body><h1>Hello from TeslaDock</h1></body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Device Info - TeslaDock</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #111;
+      color: #00ffcc;
+      padding: 2rem;
+      margin: 0;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #00ffff;
+    }
+    .info {
+      font-size: 1.2rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid #00ffcc;
+      border-radius: 8px;
+      background: #222;
+    }
+    .label {
+      font-weight: bold;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 TeslaDock - Device Info</h1>
+
+  <div class="info">
+    <div><span class="label">Viewport Width:</span> <span id="width">...</span> px</div>
+    <div><span class="label">Viewport Height:</span> <span id="height">...</span> px</div>
+    <div><span class="label">User Agent:</span> <span id="ua">...</span></div>
+  </div>
+
+  <script>
+    function updateInfo() {
+      document.getElementById('width').textContent = window.innerWidth;
+      document.getElementById('height').textContent = window.innerHeight;
+      document.getElementById('ua').textContent = navigator.userAgent;
+    }
+    window.addEventListener('resize', updateInfo);
+    updateInfo();
+  </script>
+</body>
 </html>
