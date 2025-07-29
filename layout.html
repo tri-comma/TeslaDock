@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TeslaDock - Home</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      color: #0ff;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      justify-content: center;
+      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      max-width: 100%;
+      width: 100%;
+    }
+
+    .tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.5rem;
+      background-color: #111;
+      border-radius: 12px;
+      border: 1px solid #0ff;
+      transition: transform 0.2s ease;
+    }
+
+    .tile:hover {
+      transform: scale(1.05);
+    }
+
+    .tile img {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #222;
+    }
+
+    .tile .title {
+      margin-top: 0.5rem;
+      text-align: center;
+      font-size: 0.95rem;
+      color: #fff;
+    }
+
+    @media (min-width: 1400px) {
+      .grid {
+        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 TeslaDock</h1>
+  <div class="grid" id="appGrid"></div>
+
+  <script>
+    const apps = [
+      {
+        title: "ChatGPT",
+        icon: "https://chat.openai.com/favicon.ico",
+        url: "https://chat.openai.com"
+      },
+      {
+        title: "YouTube",
+        icon: "https://www.youtube.com/s/desktop/fe1e9bc7/img/favicon.ico",
+        url: "https://youtube.com"
+      },
+      {
+        title: "Tesla",
+        icon: "https://www.tesla.com/themes/custom/tesla_frontend/assets/favicons/favicon.ico",
+        url: "https://www.tesla.com/"
+      }
+    ];
+
+    const grid = document.getElementById("appGrid");
+
+    apps.forEach(app => {
+      const a = document.createElement("a");
+      a.href = app.url;
+      a.className = "tile";
+      a.target = "_blank";
+      a.innerHTML = `
+        <img src="${app.icon}" alt="${app.title}">
+        <div class="title">${app.title}</div>
+      `;
+      grid.appendChild(a);
+    });
+  </script>
+</body>
+</html>
