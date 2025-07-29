@@ -28,6 +28,16 @@
       font-weight: bold;
       color: #ffffff;
     }
+    .icon-test {
+      margin-top: 2rem;
+    }
+    .icon-test img {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      border: 1px solid #0ff;
+      background-color: #000;
+    }
   </style>
 </head>
 <body>
@@ -39,6 +49,8 @@
     <div><span class="label">User Agent:</span> <span id="ua">...</span></div>
   </div>
 
+  <div id="img-container" class="icon-test"></div>
+
   <script>
     function updateInfo() {
       document.getElementById('width').textContent = window.innerWidth;
@@ -47,6 +59,15 @@
     }
     window.addEventListener('resize', updateInfo);
     updateInfo();
+
+    // 外部画像をJSで表示
+    const imageUrl = "https://chat.openai.com/favicon.ico";
+    const img = document.createElement("img");
+    img.src = imageUrl;
+    img.alt = "外部アイコン";
+    img.onload = () => console.log("✅ 画像の読み込みに成功しました");
+    img.onerror = () => console.log("❌ 画像の読み込みに失敗しました");
+    document.getElementById("img-container").appendChild(img);
   </script>
 </body>
 </html>
