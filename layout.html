@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TeslaDock - iOS風Grid</title>
+  <title>TeslaDock - Fixed Grid</title>
   <style>
     body {
       margin: 0;
@@ -11,6 +11,9 @@
       color: #fff;
       font-family: sans-serif;
       padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     h1 {
@@ -22,19 +25,21 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      grid-template-rows: repeat(4, 1fr);
-      gap: 1.5rem;
-      max-width: 100%;
-      width: 100%;
-      justify-items: center;
-      align-items: center;
+      grid-template-columns: repeat(7, 144px); /* 固定列数 */
+      grid-template-rows: repeat(6, 144px);    /* 固定行数 */
+      gap: 1rem;
+      justify-content: center; /* 中央寄せ */
     }
 
     .tile {
-      width: 96px;
+      width: 100%;
+      height: 100%;
       text-align: center;
       color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
     .tile img {
@@ -43,11 +48,27 @@
       border-radius: 16px;
       background: #222;
       border: 1px solid #0ff;
+      transition: transform 0.2s ease;
     }
 
     .tile .title {
-      margin-top: 0.5rem;
+      margin-top: 0.4rem;
       font-size: 0.9rem;
+    }
+
+    .tile:hover img {
+      transform: scale(1.05);
+    }
+
+    /* 画面が大きいときはアイコンを拡大 */
+    @media (min-width: 1600px) {
+      .tile img {
+        width: 112px;
+        height: 112px;
+      }
+      .tile .title {
+        font-size: 1rem;
+      }
     }
 
     .tile.empty {
@@ -60,39 +81,41 @@
   <h1>🚗 TeslaDock</h1>
 
   <div class="grid">
-    <div class="tile" style="grid-column: 1; grid-row: 1;">
+    <div class="tile">
       <a href="https://chat.openai.com" target="_blank">
         <img src="https://chat.openai.com/favicon.ico" alt="ChatGPT">
         <div class="title">ChatGPT</div>
       </a>
     </div>
 
-    <div class="tile" style="grid-column: 2; grid-row: 1;">
+    <div class="tile">
       <a href="https://youtube.com" target="_blank">
         <img src="https://www.youtube.com/s/desktop/fe1e9bc7/img/favicon.ico" alt="YouTube">
         <div class="title">YouTube</div>
       </a>
     </div>
 
-    <div class="tile" style="grid-column: 3; grid-row: 1;">
+    <div class="tile">
       <a href="https://www.tesla.com/" target="_blank">
         <img src="https://www.tesla.com/themes/custom/tesla_frontend/assets/favicons/favicon.ico" alt="Tesla">
         <div class="title">Tesla</div>
       </a>
     </div>
 
-    <!-- 空きスロット（4〜6列目） -->
-    <div class="tile empty" style="grid-column: 4; grid-row: 1;"></div>
-    <div class="tile empty" style="grid-column: 5; grid-row: 1;"></div>
-    <div class="tile empty" style="grid-column: 6; grid-row: 1;"></div>
+    <!-- 空きスロット -->
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
 
-    <!-- 2行目（まだ使わないスロット） -->
-    <div class="tile empty" style="grid-column: 1; grid-row: 2;"></div>
-    <div class="tile empty" style="grid-column: 2; grid-row: 2;"></div>
-    <div class="tile empty" style="grid-column: 3; grid-row: 2;"></div>
-    <div class="tile empty" style="grid-column: 4; grid-row: 2;"></div>
-    <div class="tile empty" style="grid-column: 5; grid-row: 2;"></div>
-    <div class="tile empty" style="grid-column: 6; grid-row: 2;"></div>
+    <!-- 2行目 -->
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
+    <div class="tile empty"></div>
   </div>
 </body>
 </html>
