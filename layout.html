@@ -3,107 +3,96 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TeslaDock - Home</title>
+  <title>TeslaDock - iOS風Grid</title>
   <style>
     body {
       margin: 0;
       background-color: #000;
       color: #fff;
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       padding: 2rem 1rem;
     }
 
     h1 {
       color: #0ff;
       font-size: 1.5rem;
+      text-align: center;
       margin-bottom: 1rem;
     }
 
     .grid {
       display: grid;
-      gap: 1rem;
-      justify-content: center;
-      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 1.5rem;
       max-width: 100%;
       width: 100%;
+      justify-items: center;
+      align-items: center;
     }
 
     .tile {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0.5rem;
-      background-color: #111;
-      border-radius: 12px;
-      border: 1px solid #0ff;
-      transition: transform 0.2s ease;
-    }
-
-    .tile:hover {
-      transform: scale(1.05);
+      width: 96px;
+      text-align: center;
+      color: #fff;
     }
 
     .tile img {
       width: 96px;
       height: 96px;
-      object-fit: contain;
-      border-radius: 12px;
+      border-radius: 16px;
       background: #222;
+      border: 1px solid #0ff;
     }
 
     .tile .title {
       margin-top: 0.5rem;
-      text-align: center;
-      font-size: 0.95rem;
-      color: #fff;
+      font-size: 0.9rem;
     }
 
-    @media (min-width: 1400px) {
-      .grid {
-        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-      }
+    .tile.empty {
+      pointer-events: none;
+      opacity: 0;
     }
   </style>
 </head>
 <body>
   <h1>🚗 TeslaDock</h1>
-  <div class="grid" id="appGrid"></div>
 
-  <script>
-    const apps = [
-      {
-        title: "ChatGPT",
-        icon: "https://chat.openai.com/favicon.ico",
-        url: "https://chat.openai.com"
-      },
-      {
-        title: "YouTube",
-        icon: "https://www.youtube.com/s/desktop/fe1e9bc7/img/favicon.ico",
-        url: "https://youtube.com"
-      },
-      {
-        title: "Tesla",
-        icon: "https://www.tesla.com/themes/custom/tesla_frontend/assets/favicons/favicon.ico",
-        url: "https://www.tesla.com/"
-      }
-    ];
+  <div class="grid">
+    <div class="tile" style="grid-column: 1; grid-row: 1;">
+      <a href="https://chat.openai.com" target="_blank">
+        <img src="https://chat.openai.com/favicon.ico" alt="ChatGPT">
+        <div class="title">ChatGPT</div>
+      </a>
+    </div>
 
-    const grid = document.getElementById("appGrid");
+    <div class="tile" style="grid-column: 2; grid-row: 1;">
+      <a href="https://youtube.com" target="_blank">
+        <img src="https://www.youtube.com/s/desktop/fe1e9bc7/img/favicon.ico" alt="YouTube">
+        <div class="title">YouTube</div>
+      </a>
+    </div>
 
-    apps.forEach(app => {
-      const a = document.createElement("a");
-      a.href = app.url;
-      a.className = "tile";
-      a.target = "_blank";
-      a.innerHTML = `
-        <img src="${app.icon}" alt="${app.title}">
-        <div class="title">${app.title}</div>
-      `;
-      grid.appendChild(a);
-    });
-  </script>
+    <div class="tile" style="grid-column: 3; grid-row: 1;">
+      <a href="https://www.tesla.com/" target="_blank">
+        <img src="https://www.tesla.com/themes/custom/tesla_frontend/assets/favicons/favicon.ico" alt="Tesla">
+        <div class="title">Tesla</div>
+      </a>
+    </div>
+
+    <!-- 空きスロット（4〜6列目） -->
+    <div class="tile empty" style="grid-column: 4; grid-row: 1;"></div>
+    <div class="tile empty" style="grid-column: 5; grid-row: 1;"></div>
+    <div class="tile empty" style="grid-column: 6; grid-row: 1;"></div>
+
+    <!-- 2行目（まだ使わないスロット） -->
+    <div class="tile empty" style="grid-column: 1; grid-row: 2;"></div>
+    <div class="tile empty" style="grid-column: 2; grid-row: 2;"></div>
+    <div class="tile empty" style="grid-column: 3; grid-row: 2;"></div>
+    <div class="tile empty" style="grid-column: 4; grid-row: 2;"></div>
+    <div class="tile empty" style="grid-column: 5; grid-row: 2;"></div>
+    <div class="tile empty" style="grid-column: 6; grid-row: 2;"></div>
+  </div>
 </body>
 </html>
