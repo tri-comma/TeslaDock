@@ -1,121 +1,266 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TeslaDock - Fixed Grid</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TeslaDock – Layout v3 (swipe)</title>
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#0b0b0e" />
   <style>
-    body {
-      margin: 0;
-      background-color: #000;
-      color: #fff;
-      font-family: sans-serif;
-      padding: 2rem 1rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    :root{
+      --bg:#0b0b0e; --fg:#e8e8ee; --muted:#a9adba; --card:#15161b; --tile:#1b1d23; --tileHover:#23262e; --accent:#69d5ff;
+      --cols: 6;  /* 1ページの横マス数 */
+      --rows: 3;  /* 1ページの縦マス数 */
+      --gap: 12px;
+      --size: 1fr;
+      --snap-ms: 320ms;
     }
+    @media (prefers-color-scheme: light){ :root{ --bg:#f7f7fb; --fg:#111217; --muted:#5b667a; --card:#ffffff; --tile:#ffffff; --tileHover:#f1f2f6; } }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; color:var(--fg); background:radial-gradient(1200px 600px at 50% -10%, rgba(105,213,255,0.12), transparent), var(--bg); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", sans-serif;}
+    header{position:sticky; top:0; z-index:10; backdrop-filter:saturate(120%) blur(8px); background: color-mix(in hsl, var(--bg) 85%, transparent); border-bottom:1px solid color-mix(in hsl, var(--fg) 10%, transparent)}
+    .wrap{max-width:1200px; margin:0 auto; padding:12px 16px}
+    h1{font-size:18px; margin:0}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .grow{flex:1}
+    button{appearance:none; border:1px solid color-mix(in hsl, var(--fg) 14%, transparent); background:var(--card); color:var(--fg); border-radius:14px; padding:8px 12px; font-weight:600; cursor:pointer}
+    button:hover{background:color-mix(in hsl, var(--card) 85%, var(--tileHover))}
 
-    h1 {
-      color: #0ff;
-      font-size: 1.5rem;
-      text-align: center;
-      margin-bottom: 1rem;
-    }
+    /* スワイプ用ビューポート */
+    .viewport{overflow:hidden; width:100%; height:100%;}
+    .strip{display:flex; width:100%; height:100%; will-change: transform; touch-action: pan-y;}
+    .page{min-width:100%; padding:0 0 8px}
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(7, 144px); /* 固定列数 */
-      grid-template-rows: repeat(6, 144px);    /* 固定行数 */
-      gap: 1rem;
-      justify-content: center; /* 中央寄せ */
-    }
+    /* 盤面（ページごとの固定グリッド） */
+    .board{display:grid; grid-template-columns: repeat(var(--cols), var(--size)); grid-template-rows: repeat(var(--rows), var(--size)); gap: var(--gap); padding:16px}
 
-    .tile {
-      width: 100%;
-      height: 100%;
-      text-align: center;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
+    /* タイル */
+    .tile{display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:16px; border:1px solid color-mix(in hsl, var(--fg) 10%, transparent); background:var(--tile); border-radius:18px; text-decoration:none; color:inherit; box-shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 30px rgba(0,0,0,.12); min-width:0}
+    .tile:hover{background:var(--tileHover)}
+    .tile:focus-visible{outline:3px solid var(--accent)}
+    .ico{font-size:28px; line-height:1}
+    .title{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+    .desc{color:var(--muted); font-size:12px}
 
-    .tile img {
-      width: 96px;
-      height: 96px;
-      border-radius: 16px;
-      background: #222;
-      border: 1px solid #0ff;
-      transition: transform 0.2s ease;
-    }
+    /* ページネーション */
+    .pager{display:flex; justify-content:center; align-items:center; gap:8px; padding:8px 0 18px; user-select:none}
+    .dot{width:8px; height:8px; border-radius:50%; background:color-mix(in hsl, var(--fg) 25%, transparent);}
+    .dot.active{background:var(--fg)}
 
-    .tile .title {
-      margin-top: 0.4rem;
-      font-size: 0.9rem;
-    }
-
-    .tile:hover img {
-      transform: scale(1.05);
-    }
-
-    /* 画面が大きいときはアイコンを拡大 */
-    @media (min-width: 1600px) {
-      .tile img {
-        width: 112px;
-        height: 112px;
-      }
-      .tile .title {
-        font-size: 1rem;
-      }
-    }
-
-    .tile.empty {
-      pointer-events: none;
-      opacity: 0;
-    }
+    /* モーダル（JSONインポート/エクスポート） */
+    dialog{border:none; border-radius:16px; padding:0; max-width:min(800px, 92vw)}
+    dialog::backdrop{backdrop-filter: blur(3px) saturate(120%)}
+    .sheet{background:var(--card); color:var(--fg); border:1px solid color-mix(in hsl, var(--fg) 10%, transparent); border-radius:16px; padding:12px}
+    textarea{width:100%; min-height:280px; padding:10px; border-radius:12px; border:1px solid color-mix(in hsl, var(--fg) 14%, transparent); background:var(--tile); color:var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+    .help{font-size:12px; color:var(--muted)}
   </style>
 </head>
 <body>
-  <h1>🚗 TeslaDock</h1>
-
-  <div class="grid">
-    <div class="tile">
-      <a href="https://chat.openai.com" target="_blank">
-        <img src="https://chat.openai.com/favicon.ico" alt="ChatGPT">
-        <div class="title">ChatGPT</div>
-      </a>
+  <header>
+    <div class="wrap row">
+      <h1>TeslaDock</h1>
+      <div class="grow"></div>
+      <div id="pageLabel" aria-live="polite">1 / 1</div>
+      <button id="btnEdit">JSON 編集</button>
     </div>
+  </header>
 
-    <div class="tile">
-      <a href="https://youtube.com" target="_blank">
-        <img src="https://www.gstatic.com/youtube/img/branding/favicon/favicon_144x144_v2.png" alt="YouTube">
-        <div class="title">YouTube</div>
-      </a>
-    </div>
+  <main class="wrap">
+    <section>
+      <div class="viewport" id="viewport">
+        <div class="strip" id="strip" aria-label="pages"></div>
+      </div>
+      <div id="pager" class="pager" aria-label="pagination" aria-live="polite"></div>
+    </section>
 
-    <div class="tile">
-      <a href="https://www.tesla.com/" target="_blank">
-        <img src="https://www.tesla.com/themes/custom/tesla_frontend/assets/favicons/favicon.ico" alt="Tesla">
-        <div class="title">Tesla</div>
-      </a>
-    </div>
+    <section class="help">
+      保存先: <strong>localStorage</strong>（キー: <code>tesladock:icons</code>）。JSONを編集して保存すると即時反映されます。<br/>
+      スキーマ: <code>{ id, name, url, icon, page, x, y }</code>（<code>x</code>, <code>y</code> は1始まり）。
+    </section>
+  </main>
 
-    <!-- 空きスロット -->
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
+  <!-- JSON編集モーダル -->
+  <dialog id="dlg">
+    <form method="dialog" class="sheet">
+      <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px">
+        <strong>アイコンJSONを編集</strong>
+        <div class="row">
+          <button id="btnFormat" value="format" title="整形">整形</button>
+          <button id="btnSample" value="sample" title="サンプルを読み込み">サンプル</button>
+          <button id="btnExport" value="export" title="クリップボードへコピー">コピー</button>
+          <button id="btnClose">✕</button>
+        </div>
+      </div>
+      <textarea id="txt" spellcheck="false" aria-label="JSON"></textarea>
+      <div class="row" style="justify-content:flex-end; margin-top:8px">
+        <button id="btnSave" value="save">保存</button>
+      </div>
+    </form>
+  </dialog>
 
-    <!-- 2行目 -->
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-    <div class="tile empty"></div>
-  </div>
+  <script>
+  ;(function(){
+    const KEY = 'tesladock:icons';
+    const qs  = (s, r=document)=>r.querySelector(s);
+    const qsa = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+    // === デフォルト構成（初回のみ localStorage に投入） ===
+    const DEFAULT = [
+      { id:'yt',  name:'YouTube',        url:'https://www.youtube.com/',         icon:'📺', page:1, x:1, y:1 },
+      { id:'ytm', name:'YT Music',       url:'https://music.youtube.com/',       icon:'🎵', page:1, x:2, y:1 },
+      { id:'net', name:'Netflix',        url:'https://www.netflix.com/',         icon:'🎬', page:1, x:3, y:1 },
+      { id:'gmap',name:'Maps',           url:'https://maps.google.com/',         icon:'🗺️', page:1, x:4, y:1 },
+      { id:'gcal',name:'Calendar',       url:'https://calendar.google.com/',     icon:'📅', page:1, x:5, y:1 },
+      { id:'gpt', name:'ChatGPT',        url:'https://chat.openai.com/',         icon:'🤖', page:1, x:6, y:1 },
+      { id:'td',  name:'TeslaDock',      url:'https://tri-comma.github.io/TeslaDock/', icon:'⚓', page:1, x:1, y:2 },
+      { id:'news',name:'News',           url:'https://news.google.com/',         icon:'🗞️', page:1, x:2, y:2 },
+      { id:'sp',  name:'Spotify',        url:'https://open.spotify.com/',        icon:'🎧', page:2, x:1, y:1 }
+    ];
+
+    function load(){
+      try{ const raw = localStorage.getItem(KEY); if(!raw){ save(DEFAULT); return DEFAULT; }
+        const data = JSON.parse(raw); if(!Array.isArray(data)) throw new Error('Array expected'); return data;
+      }catch(e){ console.warn('Invalid JSON in localStorage. Reset to DEFAULT.', e); save(DEFAULT); return DEFAULT; }
+    }
+    function save(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); }
+
+    // 状態
+    let items = load();
+    let currentPage = 1;
+
+    // ページ数
+    function maxPage(){ return Math.max(1, ...items.map(i=>i.page||1)); }
+
+    // 盤面を構築（全ページを横並びに生成）
+    function renderPages(){
+      const strip = qs('#strip');
+      strip.innerHTML = '';
+      const m = maxPage();
+      for(let p=1; p<=m; p++){
+        const page = document.createElement('section');
+        page.className = 'page';
+        const board = document.createElement('div');
+        board.className = 'board';
+        const pageItems = items.filter(i=> (i.page||1) === p);
+        for(const it of pageItems){
+          const a = document.createElement('a');
+          a.className = 'tile'; a.href = it.url; a.target = '_blank'; a.rel = 'noopener';
+          a.style.gridColumn = String(it.x||1); a.style.gridRow = String(it.y||1);
+          a.setAttribute('role','gridcell'); a.setAttribute('aria-label', it.name);
+          a.innerHTML = `<div class="ico">${escapeHtml(it.icon||'🔗')}</div><div class="title">${escapeHtml(it.name||'')}</div><div class="desc">${escapeHtml(host(it.url))}</div>`;
+          board.appendChild(a);
+        }
+        page.appendChild(board); strip.appendChild(page);
+      }
+      updateTransform(true);
+      renderPager();
+      qs('#pageLabel').textContent = `${currentPage} / ${maxPage()}`;
+    }
+
+    function host(u){ try { return new URL(u).hostname; } catch { return ''; } }
+
+    function renderPager(){
+      const p = qs('#pager'); p.innerHTML = '';
+      const m = maxPage();
+      for(let i=1;i<=m;i++){
+        const d = document.createElement('div'); d.className = 'dot' + (i===currentPage?' active':''); d.title = `ページ ${i}`;
+        d.addEventListener('click', ()=> goTo(i));
+        p.appendChild(d);
+      }
+    }
+
+    function goTo(p){ currentPage = Math.max(1, Math.min(p, maxPage())); updateTransform(); qs('#pageLabel').textContent = `${currentPage} / ${maxPage()}`; renderPager(); }
+
+    // レイアウト調整
+    function adjustGrid(){
+      const w = window.innerWidth; const h = window.innerHeight;
+      const cols = w >= 1400 ? 8 : w >= 1180 ? 6 : w >= 900 ? 5 : 4; // 1180/1920最適化
+      const rows = 3;
+      document.documentElement.style.setProperty('--cols', cols);
+      document.documentElement.style.setProperty('--rows', rows);
+    }
+
+    // === iOS風スワイプ ===
+    const strip = qs('#strip');
+    let startX=0, curX=0, dragging=false, width=0, lastX=0, lastT=0, vx=0;
+
+    function px(){ return -((currentPage-1) * width); }
+
+    function setTransform(x, withTransition=false){
+      strip.style.transition = withTransition ? `transform var(--snap-ms) cubic-bezier(.22,.55,.24,1)` : 'none';
+      strip.style.transform = `translate3d(${x}px,0,0)`;
+    }
+
+    function updateTransform(animated=false){
+      width = qs('#viewport').clientWidth || window.innerWidth;
+      setTransform(px(), animated);
+    }
+
+    function onStart(x){ dragging=true; startX=curX=lastX=x; lastT=performance.now(); vx=0; strip.style.transition='none'; width = qs('#viewport').clientWidth || window.innerWidth; }
+    function onMove(x){ if(!dragging) return; const now=performance.now(); const dx = x-startX; // 端の抵抗
+      const m = maxPage();
+      let base = px();
+      let offset = dx;
+      const atFirst = currentPage===1 && dx>0;
+      const atLast  = currentPage===m && dx<0;
+      if(atFirst || atLast){ offset *= 0.35; } // 端でのラバー
+      setTransform(base + offset, false);
+      vx = (x - lastX) / Math.max(1, (now - lastT)); // px/ms
+      lastX = x; lastT = now;
+    }
+    function onEnd(){ if(!dragging) return; dragging=false; const dx = lastX - startX; const absdx = Math.abs(dx); const threshold = (width * 0.24); // iOSっぽく約1/4
+      const fast = Math.abs(vx) > 0.45; // 速度スワイプ（~0.45px/ms）
+      const dir = dx<0 ? 1 : -1; // 左へ→次, 右へ→前
+      let target = currentPage;
+      if( (absdx > threshold) || fast){ target = currentPage + dir; }
+      target = Math.max(1, Math.min(target, maxPage()));
+      setTransform(-((target-1)*width), true);
+      currentPage = target; qs('#pageLabel').textContent = `${currentPage} / ${maxPage()}`; renderPager();
+    }
+
+    function bindSwipe(){
+      const vp = qs('#viewport');
+      // タッチ
+      vp.addEventListener('touchstart', e=>{ if(e.touches.length!==1) return; onStart(e.touches[0].clientX); }, {passive:true});
+      vp.addEventListener('touchmove',  e=>{ if(e.touches.length!==1) return; onMove(e.touches[0].clientX); }, {passive:true});
+      vp.addEventListener('touchend',   ()=> onEnd(), {passive:true});
+      // マウス/ペン（開発用）
+      let mouseDown=false;
+      vp.addEventListener('mousedown', e=>{ mouseDown=true; onStart(e.clientX); });
+      window.addEventListener('mousemove', e=>{ if(mouseDown) onMove(e.clientX); });
+      window.addEventListener('mouseup',   ()=>{ if(mouseDown){ mouseDown=false; onEnd(); } });
+    }
+
+    // === JSON編集 ===
+    const dlg = qs('#dlg'); const txt = qs('#txt');
+    qs('#btnEdit').addEventListener('click', ()=>{ txt.value = JSON.stringify(items, null, 2); dlg.showModal(); });
+    qs('#btnClose').addEventListener('click', (e)=>{ e.preventDefault(); dlg.close(); });
+    qs('#btnFormat').addEventListener('click', (e)=>{ e.preventDefault(); try{ txt.value = JSON.stringify(JSON.parse(txt.value), null, 2); }catch(err){ alert('JSONパースに失敗しました'); } });
+    qs('#btnSample').addEventListener('click', (e)=>{ e.preventDefault(); txt.value = JSON.stringify(DEFAULT, null, 2); });
+    qs('#btnExport').addEventListener('click', async (e)=>{ e.preventDefault();
+      try{ await navigator.clipboard.writeText(txt.value); alert('コピーしました'); }catch(err){ alert('コピーできませんでした'); }
+    });
+    qs('#btnSave').addEventListener('click', (e)=>{ e.preventDefault(); try{
+      const arr = JSON.parse(txt.value);
+      if(!Array.isArray(arr)) throw new Error('ルートは配列にしてください');
+      for(const o of arr){ if(!o || typeof o!== 'object') throw new Error('各要素はオブジェクトにしてください'); if(!o.name||!o.url) throw new Error('nameとurlは必須です'); }
+      items = arr; save(items); renderPages();
+      dlg.close();
+    }catch(err){ alert('保存できませんでした: '+ err.message); }
+    });
+
+    // ユーティリティ
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+
+    function onResize(){ adjustGrid(); updateTransform(); }
+
+    // 初期化
+    adjustGrid();
+    renderPages();
+    bindSwipe();
+    window.addEventListener('resize', onResize);
+  })();
+  </script>
 </body>
 </html>
