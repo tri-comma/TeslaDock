@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TeslaDock TETRIS (Phaser 3)</title>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    html,body{height:100%;margin:0;background:#0b0b0e;color:#e8e8ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
+    #game {width:100%;height:100%;}
+    .hud{position:fixed;inset:auto 0 0 0;padding:8px 12px;display:flex;gap:16px;align-items:center;justify-content:space-between;pointer-events:none}
+    .hud .box{pointer-events:auto;background:rgba(20,22,28,.7);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px) saturate(120%);border-radius:12px;padding:8px 10px;font-variant-numeric:tabular-nums}
+    .btn{appearance:none;border:1px solid rgba(255,255,255,.14);background:#15161b;color:#e8e8ee;border-radius:12px;padding:8px 12px;font-weight:700;cursor:pointer}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div class="hud">
+    <div class="box">←→/D-Pad: 移動　A/Z: 右回転　B/X: 左回転　↓: ソフトドロップ　↑/RT: ハードドロップ　P: 一時停止</div>
+    <button id="btnRestart" class="btn">リスタート</button>
+  </div>
+<script>
+(function(){
+  const CELL=24, COLS=10, ROWS=22; // 上2行は天井（見えない）
+  const VISIBLE_ROWS=20;
+  const W = COLS*CELL, H = VISIBLE_ROWS*CELL;
+  const STORAGE_KEY = 'tesladock:tetris:hiscore';
+  const getHi=()=>Number(localStorage.getItem(STORAGE_KEY)||0);
+  const setHi=(v)=>{try{localStorage.setItem(STORAGE_KEY,String(v))}catch(e){}}
+
+  const TETROS = {
+    I: {c:0x62e0f7, s:[[0,1],[1,1],[2,1],[3,1]]},
+    O: {c:0xffe066, s:[[1,0],[2,0],[1,1],[2,1]]},
+    T: {c:0xc77dff, s:[[1,0],[0,1],[1,1],[2,1]]},
+    S: {c:0x51cf66, s:[[1,0],[2,0],[0,1],[1,1]]},
+    Z: {c:0xff6b6b, s:[[0,0],[1,0],[1,1],[2,1]]},
+    J: {c:0x74c0fc, s:[[0,0],[0,1],[1,1],[2,1]]},
+    L: {c:0xfaa307, s:[[2,0],[0,1],[1,1],[2,1]]}
+  };
+  const BAG = Object.keys(TETROS);
+
+  function makeMatrix(w,h,fill){const m=new Array(h);for(let y=0;y<h;y++){m[y]=new Array(w);for(let x=0;x<w;x++)m[y][x]=fill; }return m}
+
+  function rotate(points, dir){ // dir=1: cw, -1: ccw
+    return points.map(p=> dir>0 ? [ -p[1], p[0] ] : [ p[1], -p[0] ]);
+  }
+
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+  class GameScene extends Phaser.Scene{
+    constructor(){super('g')}
+    init(){
+      this.level=1; this.lines=0; this.score=0; this.hiscore=getHi();
+      this.dropMS = 900; // 初期落下間隔
+      this.bag=[]; this.grid = makeMatrix(COLS, ROWS, null);
+      this.paused=false; this.gameOver=false;
+      this.particles=null; this.shakeCooldown=0;
+    }
+    preload(){
+      // なし（ベクタ描画のみ）
+    }
+    create(){
+      const cam = this.cameras.main; cam.setBackgroundColor('#0b0b0e');
+
+      // コンテナ
+      this.board = this.add.container((this.scale.width-W)/2, (this.scale.height-H)/2);
+      // 背景グリッド
+      const g = this.add.graphics(); g.lineStyle(1, 0x2a2e39, 1);
+      g.fillStyle(0x15161b,1).fillRect(0,0,W,H);
+      for(let x=0;x<=COLS;x++){ g.lineBetween(x*CELL,0,x*CELL,H); }
+      for(let y=0;y<=VISIBLE_ROWS;y++){ g.lineBetween(0,y*CELL,W,y*CELL); }
+      this.board.add(g);
+
+      // パーティクル用
+      const tex = this.add.graphics().fillStyle(0xffffff,1).fillRect(0,0,4,4).generateTexture('px',4,4);
+      this.particles = this.add.particles('px');
+
+      this.shadowG = this.add.graphics(); this.board.add(this.shadowG);
+      this.blockG  = this.add.graphics(); this.board.add(this.blockG);
+      this.activeG = this.add.graphics(); this.board.add(this.activeG);
+
+      this.hud = this.add.text(this.board.x+W+16, this.board.y, '', {fontFamily:'monospace',fontSize:18,color:'#e8e8ee'});
+
+      this.nextPiece();
+      this.timeSinceDrop=0;
+
+      // 入力
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keyZ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+      this.keyX = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+      this.keyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+
+      this.input.keyboard.enabled = true;
+      this.input.gamepad.on('connected', pad=>{ this.pad=pad });
+
+      // リスタートボタン
+      document.getElementById('btnRestart').onclick=()=>this.scene.restart();
+
+      this.updateHUD();
+      this.scale.on('resize', ()=>this.centerBoard());
+      this.centerBoard();
+    }
+    centerBoard(){ const Wv=this.scale.width, Hv=this.scale.height; this.board.setPosition((Wv-W)/2, (Hv-H)/2); if(this.hud) this.hud.setPosition(this.board.x+W+16, this.board.y); }
+
+    bagNext(){ if(this.bag.length===0){ this.bag = BAG.slice(); for(let i=this.bag.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [this.bag[i],this.bag[j]]=[this.bag[j],this.bag[i]]; } } return this.bag.pop(); }
+
+    newPiece(){ const k=this.bagNext(); const def=TETROS[k]; const pts=clone(def.s); return {k, c:def.c, x:3, y:0, r:0, pts}; }
+    nextPiece(){ this.cur = this.newPiece(); if(this.collide(this.cur, this.cur.x, this.cur.y)){ this.gameOver=true; this.onGameOver(); } }
+
+    collide(piece, ox, oy){
+      for(const p of piece.pts){ const x=ox+p[0], y=oy+p[1]; if(y<0) continue; if(x<0||x>=COLS||y>=ROWS) return true; if(this.grid[y][x]) return true; }
+      return false;
+    }
+
+    lock(){ // ピースを盤に固定
+      for(const p of this.cur.pts){ const x=this.cur.x+p[0], y=this.cur.y+p[1]; if(y>=0) this.grid[y][x]={c:this.cur.c}; }
+      this.clearLines();
+      this.nextPiece();
+    }
+
+    clearLines(){ let cleared=0; for(let y=ROWS-1;y>=2;y--){ // 上2行は天井
+        let full=true; for(let x=0;x<COLS;x++){ if(!this.grid[y][x]){full=false;break;} }
+        if(full){ this.grid.splice(y,1); this.grid.unshift(new Array(COLS).fill(null)); cleared++; y++; // 同じ行を再評価
+        }
+      }
+      if(cleared>0){
+        const bonus = [0,100,300,500,800][cleared]|| (800+ (cleared-4)*400);
+        this.score += bonus * this.level;
+        this.lines += cleared;
+        // レベルアップ: ライン5ごとにスピードアップ
+        const newLevel = 1 + Math.floor(this.lines/5);
+        if(newLevel>this.level){ this.level=newLevel; this.dropMS = Math.max(80, 900 - (this.level-1)*60); this.cameras.main.flash(120,255,255,255); }
+        this.emitLineParticles();
+        this.cameras.main.shake(100, 0.006);
+        this.updateHUD();
+      }
+    }
+
+    emitLineParticles(){
+      // 下方向に飛ぶ火花
+      const e = this.particles.createEmitter({ x:this.board.x+W/2, y:this.board.y+H-2, speed: {min:80,max:160}, angle:{min:260,max:280}, gravityY:400, lifespan:600, quantity:40, scale:{start:0.8,end:0}, tint:0xffffff, blendMode:'ADD' });
+      this.time.delayedCall(300, ()=>e.stop());
+    }
+
+    hardDrop(){ let y=this.cur.y; while(!this.collide(this.cur, this.cur.x, y+1)) y++; this.cur.y=y; this.lock(); this.score+=2; this.updateHUD(); }
+
+    rotatePiece(dir){ const r=rotate(this.cur.pts,dir); // SRS簡易: 左/右/上オフセットで妥協
+      const kicks=[[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0]];
+      for(const [dx,dy] of kicks){ if(!this.collide({pts:r}, this.cur.x+dx, this.cur.y+dy)){ this.cur.pts=r; this.cur.x+=dx; this.cur.y+=dy; return; } }
+    }
+
+    move(dx){ if(!this.collide(this.cur, this.cur.x+dx, this.cur.y)){ this.cur.x+=dx; }
+    }
+
+    softDrop(){ if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; this.score++; this.updateHUD(); }
+    }
+
+    update(time, dt){ if(this.paused||this.gameOver) return; this.handleInput(dt); this.timeSinceDrop+=dt; if(this.timeSinceDrop>=this.dropMS){ this.timeSinceDrop=0; if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; } else { this.lock(); } }
+      this.drawBoard();
+    }
+
+    handleInput(dt){ const c=this.cursors, p=this.pad; // キー
+      if(Phaser.Input.Keyboard.JustDown(this.keyP)) { this.togglePause(); }
+      if(Phaser.Input.Keyboard.JustDown(this.keyZ)) { this.rotatePiece(1); }
+      if(Phaser.Input.Keyboard.JustDown(this.keyX)) { this.rotatePiece(-1); }
+      if(Phaser.Input.Keyboard.JustDown(c.up)) { this.hardDrop(); }
+      if(Phaser.Input.Keyboard.JustDown(c.left)) { this.move(-1); this.repeatLRStart('L'); }
+      if(Phaser.Input.Keyboard.JustDown(c.right)) { this.move(1);  this.repeatLRStart('R'); }
+      if(c.down.isDown) { this.softDrop(); }
+
+      // キーリピート（横移動）：iOSコントローラ感覚のオートリピート
+      this.lrTimer = this.lrTimer||0; this.lrDir = this.lrDir||null; this.lrDelay=this.lrDelay||180; this.lrInterval=this.lrInterval||50;
+      if(this.lrDir){ this.lrTimer += dt; if(this.lrTimer >= (this.lrFired? this.lrInterval : this.lrDelay)){ this.lrTimer=0; this.lrFired=true; this.move(this.lrDir==='L'?-1:1); } }
+      if(c.left.isUp && c.right.isUp){ this.lrDir=null; this.lrFired=false; this.lrTimer=0; }
+
+      // ゲームパッド
+      if(p){ const ax = Math.abs(p.axes.length? p.axes[0].getValue():0) > 0.3 ? p.axes[0].getValue():0; const dLeft=p.left, dRight=p.right, dUp=p.up, dDown=p.down;
+        const a=p.A, b=p.B, x=p.X, y=p.Y, rt=p.R2 || p.rightTrigger;
+        // 回転: A/×=右回転, B/○=左回転 風に
+        if(a && Phaser.Input.Gamepad.Configs.XBOX360.A.justPressed(p)) this.rotatePiece(1);
+        if(b && Phaser.Input.Gamepad.Configs.XBOX360.B.justPressed(p)) this.rotatePiece(-1);
+        if(x && Phaser.Input.Gamepad.Configs.XBOX360.X.justPressed(p)) this.rotatePiece(-1);
+        if(y && Phaser.Input.Gamepad.Configs.XBOX360.Y.justPressed(p)) this.rotatePiece(1);
+        if(rt && p.rightTrigger>0.6){ this.hardDrop(); }
+        // 方向
+        if( (dLeft && dLeft.justPressed) || ax < -0.5 ){ this.move(-1); this.repeatLRStart('L'); }
+        if( (dRight && dRight.justPressed) || ax > 0.5 ){ this.move(1); this.repeatLRStart('R'); }
+        if(dUp && dUp.justPressed){ this.hardDrop(); }
+        if(dDown && dDown.pressed){ this.softDrop(); }
+      }
+    }
+    repeatLRStart(dir){ this.lrDir=dir; this.lrTimer=0; this.lrFired=false; }
+
+    drawBoard(){ this.blockG.clear(); this.activeG.clear(); this.shadowG.clear();
+      // 盤
+      for(let y=2;y<ROWS;y++){
+        for(let x=0;x<COLS;x++){
+          const cell=this.grid[y][x]; if(cell){ this.drawCell(this.blockG, x, y-2, cell.c, 1.0); }
+        }
+      }
+      // ゴースト
+      let gy=this.cur.y; while(!this.collide(this.cur, this.cur.x, gy+1)) gy++; this.drawPiece(this.shadowG, this.cur, gy-2, 0.28, true);
+      // 現在
+      this.drawPiece(this.activeG, this.cur, this.cur.y-2, 1.0, false, true);
+    }
+
+    drawPiece(g, piece, oy, alpha, dashed, glow){ for(const p of piece.pts){ const x=piece.x+p[0], y=oy+p[1]; if(y<0) continue; this.drawCell(g, x, y, piece.c, alpha, dashed, glow); } }
+
+    drawCell(g, x, y, color, alpha=1, dashed=false, glow=false){ const px=x*CELL, py=y*CELL; const c=color;
+      // 外枠
+      g.fillStyle(Phaser.Display.Color.IntegerToColor(c).darken(25).color, alpha).fillRoundedRect(px+1,py+1,CELL-2,CELL-2,5);
+      // 面
+      g.fillStyle(c, alpha).fillRoundedRect(px+3,py+3,CELL-6,CELL-6,4);
+      // ハイライト
+      g.lineStyle(2, 0xffffff, 0.35*alpha).strokeRoundedRect(px+3,py+3,CELL-6,CELL-6,4);
+      if(glow){ g.lineStyle(3, c, 0.3*alpha).strokeRoundedRect(px+1,py+1,CELL-2,CELL-2,5); }
+      if(dashed){ g.lineStyle(1, 0xffffff, 0.15).strokeRect(px+4,py+4,CELL-8,CELL-8); }
+    }
+
+    updateHUD(){ this.hud.setText(`SCORE ${this.score}\nLINES ${this.lines}\nLEVEL ${this.level}\nHI ${Math.max(this.hiscore,this.score)}`); }
+
+    togglePause(){ this.paused=!this.paused; this.cameras.main.setAlpha(this.paused?0.6:1); }
+
+    onGameOver(){ this.cameras.main.shake(220,0.01); this.cameras.main.flash(180,255,0,0); this.paused=true; if(this.score>this.hiscore){ setHi(this.score); this.hiscore=this.score; }
+      const t = this.add.text(this.scale.width/2, this.scale.height/2, 'GAME OVER\nPress Restart', {fontFamily:'monospace',fontSize:28,color:'#fff',align:'center'}).setOrigin(0.5);
+    }
+  }
+
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: Math.max(360, COLS*CELL+220), // 右にHUD
+    height: Math.max(480, VISIBLE_ROWS*CELL+40),
+    backgroundColor: '#0b0b0e',
+    scene: [GameScene],
+    scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH},
+    fps: { target: 60, forceSetTimeOut: true },
+    input: { gamepad: true }
+  };
+
+  new Phaser.Game(config);
+})();
+</script>
+</body>
+</html>
