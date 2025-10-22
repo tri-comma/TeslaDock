@@ -106,6 +106,9 @@
       this.paused=false; this.gameOver=false; this.particles=null; this.shakeCooldown=0;
       this.lrTimer=0; this.lrDir=null; this.lrFired=false; this.lrDelay=180; this.lrInterval=50;
       this.pad=null; this.padPollMS=180; this.padAccum=0;
+      this.prevAx = 0;    // 直前フレームの軸値
+      this.padPrev = [];  // 直前のボタン状態
+      this.softAccum = 0; // ソフトドロップのスロットル(ms累積)
     },
     preload: function(){},
     create: function(){
@@ -174,15 +177,45 @@
       if(c.down.isDown) this.softDrop();
       if(this.lrDir){ this.lrTimer += dt; if(this.lrTimer >= (this.lrFired? this.lrInterval : this.lrDelay)){ this.lrTimer=0; this.lrFired=true; this.move(this.lrDir==='L'?-1:1); } }
       if(c.left.isUp && c.right.isUp){ this.lrDir=null; this.lrFired=false; this.lrTimer=0; }
-      var p=this.pad; if(p){ var ax = (p.axes && typeof p.axes[0]==='number') ? p.axes[0] : 0;
-        if(this.padPressed(0) || this.padPressed(2)) this.rotatePiece(1);
-        if(this.padPressed(1) || this.padPressed(3)) this.rotatePiece(-1);
-        if(this.padPressed(12)) this.hardDrop();
-        if(this.padPressed(13)) this.softDrop();
-        if(this.padPressed(14) || ax < -0.5){ this.move(-1); this.repeatLRStart('L'); }
-        if(this.padPressed(15) || ax > 0.5){ this.move(1);  this.repeatLRStart('R'); }
-        if(this.padPressed(7)) this.hardDrop();
+      var p=this.pad; if(p){
+        var ax = (p.axes && typeof p.axes[0]==='number') ? p.axes[0] : 0;
+
+        // 単発アクションは「縁判定」
+        if(this.padJustPressed(0) || this.padJustPressed(2)) this.rotatePiece(1);
+        if(this.padJustPressed(1) || this.padJustPressed(3)) this.rotatePiece(-1);
+        if(this.padJustPressed(12) || this.padJustPressed(7)) this.hardDrop(); // DpadUp/RT
+
+        // ソフトドロップはスロットル（例: 50msごとに1段）
+        if(this.padPressed(13)){ this.softAccum += dt; if(this.softAccum >= 50){ this.softAccum = 0; this.softDrop(); } }
+        else { this.softAccum = 0; }
+
+        // 横移動は「縁で開始」→ DAS/ARRに委ねる（axesも縁検出へ）
+        if( this.padJustPressed(14) || this.axisLeftJustPressed(ax) ) {
+          this.move(-1); this.repeatLRStart('L');
+        } else if( this.padJustPressed(15) || this.axisRightJustPressed(ax) ) {
+          this.move(1);  this.repeatLRStart('R');
+        }
+
+        // スティックがニュートラル＆Dpad解放なら停止（維持）
+        if( !(this.padPressed(14)||this.padPressed(15)) && Math.abs(ax) <= 0.5 ){
+          this.lrDir=null; this.lrFired=false; this.lrTimer=0;
+        }
+
+        // いちばん最後に prevAx を更新
+        this.prevAx = ax;
+
       }
+    },
+    axisLeftJustPressed: function(ax, thresh){ thresh = thresh || 0.5; 
+      return (this.prevAx >= -thresh) && (ax < -thresh);
+    },
+    axisRightJustPressed: function(ax, thresh){ thresh = thresh || 0.5; 
+      return (this.prevAx <=  thresh) && (ax >  thresh);
+    },
+    padJustPressed: function(index){
+      var now = this.padPressed(index), prev = !!this.padPrev[index];
+      this.padPrev[index] = now;
+      return now && !prev;  // 立ち上がり縁だけ true
     },
     repeatLRStart: function(dir){ this.lrDir=dir; this.lrTimer=0; this.lrFired=false; },
     drawBoard: function(){ this.blockG.clear(); this.activeG.clear(); this.shadowG.clear();
