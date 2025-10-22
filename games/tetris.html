@@ -9,14 +9,12 @@
     html,body{height:100%;margin:0;background:#0b0b0e;color:#e8e8ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
     /* 中央カラムのサイズをプレイ領域に合わせて素直にレイアウト */
     #game { display:flex; align-items:flex-start; justify-content:center; }
-    #game canvas { display:block; } /* 余白や改行の影響を消す */
+    #game canvas { display:block; width: auto; }
 
     /* 三カラムの明示的な配置（swap時の崩れ防止） */
     #sideL { grid-column:1; }
     #game  { grid-column:2; }
     #sideR { grid-column:3; }
-    .hud{position:fixed;inset:auto 0 0 0;padding:8px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between;pointer-events:none}
-    .hud .box{pointer-events:auto;background:rgba(20,22,28,.7);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px) saturate(120%);border-radius:12px;padding:8px 10px;font-variant-numeric:tabular-nums}
     .btn{appearance:none;border:1px solid rgba(255,255,255,.14);background:#15161b;color:#e8e8ee;border-radius:12px;padding:8px 12px;font-weight:700;cursor:pointer}
     #debug{position:fixed;left:8px;right:8px;bottom:64px;max-height:36vh;overflow:auto;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px;display:none;white-space:pre-wrap;z-index:1000}
     .cluster{display:flex;gap:8px;pointer-events:auto}
@@ -24,7 +22,7 @@
     .tp-btn:active{transform:scale(.97)}
     @media (min-width:900px){ .tp-btn{min-width:64px;min-height:64px} }
     /* 固定レイアウト：左右260px／中央は固定キャンバス幅 */
-    .stage{max-width: calc(260px + 240px + 260px); /* 240pxは後述のWに合わせて調整 */ 
+    .stage{max-width: calc(260px + 640px + 260px); /* 240pxは後述のWに合わせて調整 */ 
       margin:16px auto; display:grid; grid-template-columns:260px auto 260px; align-items:start; gap:12px}
     .side{display:flex; flex-direction:column; gap:12px}
     .panel{background:rgba(20,22,28,.7);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px}
@@ -79,11 +77,6 @@
 
   <div id="debug"></div>
 
-  <div class="hud">
-    <div class="box">タッチ：← → ↓ 回転⟲/⟳ ハード⏬　/　P:一時停止　R:リスタート</div>
-    <div class="box" id="hudText">SCORE 0</div>
-  </div>
-
 <script>
 (function(){
   'use strict';
@@ -103,7 +96,7 @@
   }
   window.onerror = function(m,s,l,c,e){ debugOn=true; debugBox.style.display='block'; log('ERROR', m, s+':'+l); };
 
-  var CELL=24, COLS=10, ROWS=22; // 上2行は天井
+  var CELL=44, COLS=10, ROWS=22; // 上2行は天井
   var VISIBLE_ROWS=20;
   var W = COLS*CELL, H = VISIBLE_ROWS*CELL;
   var STORAGE_KEY = 'tesladock:tetris:hiscore';
@@ -138,13 +131,13 @@
       this.level=1; this.lines=0; this.score=0; this.hiscore=getHi();
       this.dropMS = 900; this.bag=[]; this.grid = makeMatrix(COLS, ROWS, null);
       this.paused=false; this.gameOver=false; this.particles=null; this.shakeCooldown=0;
-      this.lrTimer=0; this.lrDir=null; this.lrFired=false; this.lrDelay=180; this.lrInterval=50;
-      this.pad=null; this.padPollMS=180; this.padAccum=0;
+      this.lrTimer=0; this.lrDir=null; this.lrFired=false; this.lrDelay=120; this.lrInterval=35;
+      this.pad=null; this.padPollMS=0; this.padAccum=0;
       this.prevAx = 0;    // 直前フレームの軸値
       this.padPrev = [];  // 直前のボタン状態
       this.softAccum = 0; // ソフトドロップのスロットル(ms累積)
-      this.AX_PRESS = 0.5;
-      this.AX_RELEASE = 0.35;      
+      this.AX_PRESS = 0.40;
+      this.AX_RELEASE = 0.30;      
     },
     preload: function(){},
     create: function(){
@@ -159,7 +152,6 @@
       this.shadowG = this.add.graphics(); this.board.add(this.shadowG);
       this.blockG  = this.add.graphics(); this.board.add(this.blockG);
       this.activeG = this.add.graphics(); this.board.add(this.activeG);
-      this.hudText = document.getElementById('hudText');
       this.timeSinceDrop=0;
       this.cur = this.newPiece();
       this.peek = this.newPiece();
@@ -219,7 +211,7 @@
     softDrop: function(){ if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; this.score++; this.updateHUD(); } },
     pollPad: function(){ try{ var arr = (navigator.getGamepads && navigator.getGamepads()) || []; if(!arr){ this.pad=null; this.prevAx = 0; return; } this.pad=null; for(var i=0;i<arr.length;i++){ var p=arr[i]; if(p && (p.connected === undefined || p.connected)){ this.pad=p; break; } } }catch(e){ this.pad=null; this.prevAx = 0; } },
     padPressed: function(index){ var p=this.pad; if(!p || !p.buttons || !p.buttons[index]) return false; var b=p.buttons[index]; return !!(b.pressed || b.touched || (typeof b.value==='number' && b.value>0.5)); },
-    update: function(time, dt){ if(this.paused||this.gameOver) return; this.handleInput(dt); this.padAccum+=dt; if(this.padAccum>=this.padPollMS){ this.padAccum=0; this.pollPad(); if(debugOn) log('pad:', this.pad? this.pad.id : 'none'); }
+    update: function(time, dt){ if(this.paused||this.gameOver) return; this.handleInput(dt); this.pollPad();
       this.timeSinceDrop+=dt; if(this.timeSinceDrop>=this.dropMS){ this.timeSinceDrop=0; if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; } else { this.lock(); } }
       this.drawBoard(); },
     handleInput: function(dt){
@@ -247,9 +239,9 @@
         else { this.softAccum = 0; }
 
         // 横移動は「縁で開始」→ DAS/ARRに委ねる（axesも縁検出へ）
-        if( this.padJustPressed(14) || this.axisLeftJustPressed(ax) ) {
+        if( this.padJustPressed(14) || this.axisLeftJustPressed(ax, this.AX_PRESS) ) {
           this.move(-1); this.repeatLRStart('L');
-        } else if( this.padJustPressed(15) || this.axisRightJustPressed(ax) ) {
+        } else if( this.padJustPressed(15) || this.axisRightJustPressed(ax, this.AX_PRESS) ) {
           this.move(1);  this.repeatLRStart('R');
         }
 
