@@ -7,43 +7,77 @@
   <meta name="color-scheme" content="dark light" />
   <style>
     html,body{height:100%;margin:0;background:#0b0b0e;color:#e8e8ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
-    #game {width:100%;height:100%;}
+    /* 中央カラムのサイズをプレイ領域に合わせて素直にレイアウト */
+    #game { display:flex; align-items:flex-start; justify-content:center; }
+    #game canvas { display:block; } /* 余白や改行の影響を消す */
+
+    /* 三カラムの明示的な配置（swap時の崩れ防止） */
+    #sideL { grid-column:1; }
+    #game  { grid-column:2; }
+    #sideR { grid-column:3; }
     .hud{position:fixed;inset:auto 0 0 0;padding:8px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between;pointer-events:none}
     .hud .box{pointer-events:auto;background:rgba(20,22,28,.7);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px) saturate(120%);border-radius:12px;padding:8px 10px;font-variant-numeric:tabular-nums}
     .btn{appearance:none;border:1px solid rgba(255,255,255,.14);background:#15161b;color:#e8e8ee;border-radius:12px;padding:8px 12px;font-weight:700;cursor:pointer}
-
     #debug{position:fixed;left:8px;right:8px;bottom:64px;max-height:36vh;overflow:auto;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px;display:none;white-space:pre-wrap;z-index:1000}
-
-    .touchpad{position:fixed;left:8px;right:8px;bottom:70px;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none}
     .cluster{display:flex;gap:8px;pointer-events:auto}
     .tp-btn{min-width:56px;min-height:56px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(21,22,27,.8);backdrop-filter:blur(4px);color:#e8e8ee;font-weight:800}
     .tp-btn:active{transform:scale(.97)}
     @media (min-width:900px){ .tp-btn{min-width:64px;min-height:64px} }
+    /* 固定レイアウト：左右260px／中央は固定キャンバス幅 */
+    .stage{max-width: calc(260px + 240px + 260px); /* 240pxは後述のWに合わせて調整 */ 
+      margin:16px auto; display:grid; grid-template-columns:260px auto 260px; align-items:start; gap:12px}
+    .side{display:flex; flex-direction:column; gap:12px}
+    .panel{background:rgba(20,22,28,.7);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px}
+    .kv{display:flex; justify-content:space-between; gap:8px; font-variant-numeric:tabular-nums}
+    .label{opacity:.8; font-size:12px; margin-bottom:6px}
+    .btn.wide{width:100%}
+    .controls .row{display:flex; justify-content:center; gap:8px; margin:6px 0}
+    .tp-btn{min-width:56px; min-height:56px; border-radius:12px; border:1px solid rgba(255,255,255,.14);
+      background:rgba(21,22,27,.8); color:#e8e8ee; font-weight:800}
+    .stage.swap{grid-template-columns:260px auto 260px}
+    .stage.swap #sideL{ grid-column:3; }
+    .stage.swap #sideR{ grid-column:1; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
 </head>
 <body>
-  <div id="game"></div>
+  <div class="stage" id="stage">
+    <aside class="side" id="sideL">
+      <div class="panel">
+        <div class="kv"><b>SCORE</b> <span id="uiScore">0</span></div>
+        <div class="kv"><b>LEVEL</b> <span id="uiLevel">1</span></div>
+      </div>
+      <div class="panel">
+        <div class="label">NEXT</div>
+        <canvas id="nextCanvas" width="96" height="96"></canvas>
+      </div>
+      <div class="panel">
+        <button class="btn wide" id="btnRestart2">↻ Reset</button>
+        <button class="btn wide" id="btnSwap">⇄ 左右入替</button>
+      </div>
+    </aside>
+
+    <div id="game"></div>
+
+    <aside class="side" id="sideR">
+      <div class="panel controls">
+        <div class="row">
+          <button class="tp-btn" id="btnUp">↑</button>
+        </div>
+        <div class="row">
+          <button class="tp-btn" id="btnLeft">←</button>
+          <button class="tp-btn" id="btnDown">↓</button>
+          <button class="tp-btn" id="btnRight">→</button>
+        </div>
+        <div class="row">
+          <button class="tp-btn" id="btnRotL">⟲</button>
+          <button class="tp-btn" id="btnRotR">⟳</button>
+        </div>
+      </div>
+    </aside>
+  </div>
 
   <div id="debug"></div>
-
-  <div class="touchpad">
-    <div class="cluster">
-      <button class="tp-btn" id="btnLeft">←</button>
-      <button class="tp-btn" id="btnRight">→</button>
-      <button class="tp-btn" id="btnDown">↓</button>
-    </div>
-    <div class="cluster">
-      <button class="tp-btn" id="btnRotL">⟲</button>
-      <button class="tp-btn" id="btnRotR">⟳</button>
-      <button class="tp-btn" id="btnHard">⏬</button>
-    </div>
-    <div class="cluster">
-      <button class="tp-btn" id="btnPause">⏸</button>
-      <button class="tp-btn" id="btnRestart">↻</button>
-      <button class="tp-btn" id="btnDebug">🐞</button>
-    </div>
-  </div>
 
   <div class="hud">
     <div class="box">タッチ：← → ↓ 回転⟲/⟳ ハード⏬　/　P:一時停止　R:リスタート</div>
@@ -109,6 +143,8 @@
       this.prevAx = 0;    // 直前フレームの軸値
       this.padPrev = [];  // 直前のボタン状態
       this.softAccum = 0; // ソフトドロップのスロットル(ms累積)
+      this.AX_PRESS = 0.5;
+      this.AX_RELEASE = 0.35;      
     },
     preload: function(){},
     create: function(){
@@ -124,34 +160,55 @@
       this.blockG  = this.add.graphics(); this.board.add(this.blockG);
       this.activeG = this.add.graphics(); this.board.add(this.activeG);
       this.hudText = document.getElementById('hudText');
-      this.nextPiece(); this.timeSinceDrop=0;
+      this.timeSinceDrop=0;
+      this.cur = this.newPiece();
+      this.peek = this.newPiece();
+      this.drawNextPreview(this.peek);
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyZ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
       this.keyX = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
       this.keyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
       this.keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
+      bindTap('#btnUp',   this, function(){ this.hardDrop(); });
       bindHold('#btnLeft', this, function(){ this.move(-1); });
-      bindHold('#btnRight', this, function(){ this.move(1); });
+      bindHold('#btnRight',this, function(){ this.move(1); });
       bindHold('#btnDown', this, function(){ this.softDrop(); });
-      bindTap('#btnRotL', this, function(){ this.rotatePiece(-1); });
-      bindTap('#btnRotR', this, function(){ this.rotatePiece(1); });
-      bindTap('#btnHard', this, function(){ this.hardDrop(); });
-      bindTap('#btnPause', this, function(){ this.togglePause(); });
-      var self=this;
-      document.getElementById('btnRestart').addEventListener('click', function(){ self.scene.restart(); });
-      document.getElementById('btnDebug').addEventListener('click', function(){ debugOn=!debugOn; debugBox.style.display = debugOn? 'block':'none'; log('debug:on'); });
-
+      bindTap('#btnRotL',  this, function(){ this.rotatePiece(-1); });
+      bindTap('#btnRotR',  this, function(){ this.rotatePiece(1); });
+      var self = this;
+      document.getElementById('btnRestart2').addEventListener('click', function(){
+        self.scene.restart();
+      });
+      
       this.scale.on('resize', this.centerBoard, this);
       this.centerBoard();
       this.updateHUD();
+
+      var stage = document.getElementById('stage');
+      var swapKey = 'tesladock:tetris:swap';
+      if(localStorage.getItem(swapKey)==='1'){ stage.classList.add('swap'); }
+      document.getElementById('btnSwap').addEventListener('click', function(){
+        stage.classList.toggle('swap');
+        localStorage.setItem(swapKey, stage.classList.contains('swap') ? '1' : '0');
+      });      
     },
     centerBoard: function(){ var Wv=this.scale.width, Hv=this.scale.height; this.board.setPosition((Wv-W)/2, (Hv-H)/2); },
     bagNext: function(){ if(this.bag.length===0){ this.bag = BAG_KEYS.slice(); for(var i=this.bag.length-1;i>0;i--){ var j=(Math.random()* (i+1))|0; var tmp=this.bag[i]; this.bag[i]=this.bag[j]; this.bag[j]=tmp; } } return this.bag.pop(); },
     newPiece: function(){ var k=this.bagNext(); var def=TETROS[k]; var pts=clone(def.s); return {k:k, c:def.c, x:3, y:0, r:0, pts:pts}; },
-    nextPiece: function(){ this.cur = this.newPiece(); if(this.collide(this.cur, this.cur.x, this.cur.y)){ this.gameOver=true; this.onGameOver(); } },
     collide: function(piece, ox, oy){ for(var i=0;i<piece.pts.length;i++){ var p=piece.pts[i]; var x=ox+p[0], y=oy+p[1]; if(y<0) continue; if(x<0||x>=COLS||y>=ROWS) return true; if(this.grid[y][x]) return true; } return false; },
-    lock: function(){ for(var i=0;i<this.cur.pts.length;i++){ var p=this.cur.pts[i]; var x=this.cur.x+p[0], y=this.cur.y+p[1]; if(y>=0) this.grid[y][x]={c:this.cur.c}; } this.clearLines(); this.nextPiece(); },
+    lock: function(){
+      for(var i=0;i<this.cur.pts.length;i++){
+        var p=this.cur.pts[i]; var x=this.cur.x+p[0], y=this.cur.y+p[1];
+        if(y>=0) this.grid[y][x]={c:this.cur.c};
+      }
+      this.clearLines();
+      // 次ピースへローテーション
+      this.cur = this.peek;
+      this.peek = this.newPiece();
+      this.drawNextPreview(this.peek);
+      if(this.collide(this.cur, this.cur.x, this.cur.y)){ this.gameOver=true; this.onGameOver(); }
+    },
     clearLines: function(){ var cleared=0; for(var y=ROWS-1;y>=2;y--){ var full=true; for(var x=0;x<COLS;x++){ if(!this.grid[y][x]){full=false;break;} } if(full){ this.grid.splice(y,1); this.grid.unshift(new Array(COLS).fill(null)); cleared++; y++; } }
       if(cleared>0){ var bonus=[0,100,300,500,800][cleared]|| (800+(cleared-4)*400); this.score += bonus * this.level; this.lines += cleared; var newLevel = 1 + Math.floor(this.lines/5); if(newLevel>this.level){ this.level=newLevel; this.dropMS = Math.max(80, 900 - (this.level-1)*60); this.cameras.main.flash(120,255,255,255); } this.emitLineParticles(); this.cameras.main.shake(100, 0.006); this.updateHUD(); }
     },
@@ -160,7 +217,7 @@
     rotatePiece: function(dir){ var r=rotate(this.cur.pts,dir); var kicks=[[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0]]; for(var i=0;i<kicks.length;i++){ var d=kicks[i]; if(!this.collide({pts:r}, this.cur.x+d[0], this.cur.y+d[1])){ this.cur.pts=r; this.cur.x+=d[0]; this.cur.y+=d[1]; return; } } },
     move: function(dx){ if(!this.collide(this.cur, this.cur.x+dx, this.cur.y)) this.cur.x+=dx; },
     softDrop: function(){ if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; this.score++; this.updateHUD(); } },
-    pollPad: function(){ try{ var arr = (navigator.getGamepads && navigator.getGamepads()) || []; if(!arr){ this.pad=null; return; } this.pad=null; for(var i=0;i<arr.length;i++){ var p=arr[i]; if(p && (p.connected === undefined || p.connected)){ this.pad=p; break; } } }catch(e){ this.pad=null; } },
+    pollPad: function(){ try{ var arr = (navigator.getGamepads && navigator.getGamepads()) || []; if(!arr){ this.pad=null; this.prevAx = 0; return; } this.pad=null; for(var i=0;i<arr.length;i++){ var p=arr[i]; if(p && (p.connected === undefined || p.connected)){ this.pad=p; break; } } }catch(e){ this.pad=null; this.prevAx = 0; } },
     padPressed: function(index){ var p=this.pad; if(!p || !p.buttons || !p.buttons[index]) return false; var b=p.buttons[index]; return !!(b.pressed || b.touched || (typeof b.value==='number' && b.value>0.5)); },
     update: function(time, dt){ if(this.paused||this.gameOver) return; this.handleInput(dt); this.padAccum+=dt; if(this.padAccum>=this.padPollMS){ this.padAccum=0; this.pollPad(); if(debugOn) log('pad:', this.pad? this.pad.id : 'none'); }
       this.timeSinceDrop+=dt; if(this.timeSinceDrop>=this.dropMS){ this.timeSinceDrop=0; if(!this.collide(this.cur, this.cur.x, this.cur.y+1)){ this.cur.y++; } else { this.lock(); } }
@@ -197,7 +254,7 @@
         }
 
         // スティックがニュートラル＆Dpad解放なら停止（維持）
-        if( !(this.padPressed(14)||this.padPressed(15)) && Math.abs(ax) <= 0.5 ){
+        if( !(this.padPressed(14)||this.padPressed(15)) && Math.abs(ax) <= this.AX_RELEASE ){
           this.lrDir=null; this.lrFired=false; this.lrTimer=0;
         }
 
@@ -225,19 +282,45 @@
     },
     drawPiece: function(g, piece, oy, alpha, dashed, glow){ for(var i=0;i<piece.pts.length;i++){ var p=piece.pts[i]; var x=piece.x+p[0], y=oy+p[1]; if(y<0) continue; this.drawCell(g, x, y, piece.c, alpha, dashed, glow); } },
     drawCell: function(g, x, y, color, alpha, dashed, glow){ if(alpha===undefined) alpha=1; if(dashed===undefined) dashed=false; if(glow===undefined) glow=false; var px=x*CELL, py=y*CELL; var c=color; g.fillStyle(Phaser.Display.Color.IntegerToColor(c).darken(25).color, alpha).fillRoundedRect(px+1,py+1,CELL-2,CELL-2,5); g.fillStyle(c, alpha).fillRoundedRect(px+3,py+3,CELL-6,CELL-6,4); g.lineStyle(2, 0xffffff, 0.35*alpha).strokeRoundedRect(px+3,py+3,CELL-6,CELL-6,4); if(glow){ g.lineStyle(3, c, 0.3*alpha).strokeRoundedRect(px+1,py+1,CELL-2,CELL-2,5); } if(dashed){ g.lineStyle(1, 0xffffff, 0.15).strokeRect(px+4,py+4,CELL-8,CELL-8); } },
-    updateHUD: function(){ var txt = 'SCORE '+this.score+'  LINES '+this.lines+'  LEVEL '+this.level+'  HI '+Math.max(this.hiscore,this.score); this.hudText.textContent = txt; },
+    updateHUD: function(){
+      document.getElementById('uiScore').textContent = this.score + ' / HI ' + Math.max(this.hiscore,this.score);
+      document.getElementById('uiLevel').textContent = this.level;
+    },
+    drawNextPreview: function(piece){
+      var cvs = document.getElementById('nextCanvas');
+      if(!cvs) return;
+      var ctx = cvs.getContext('2d');
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      if(!piece) return;
+      // ミノを中央寄せで描く（CELLの半分サイズでプレビュー）
+      var s = Math.floor(CELL * 0.9);
+      var off = Math.floor((cvs.width - 4*s)/2);
+      ctx.fillStyle = '#fff';
+      for(var i=0;i<piece.pts.length;i++){
+        var p = piece.pts[i];
+        var x = off + p[0]*s, y = off + p[1]*s;
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x+2,y+2,s,s);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#'+('000000'+TETROS[piece.k].c.toString(16)).slice(-6);
+        ctx.fillRect(x,y,s,s);
+      }
+    },
     togglePause: function(){ this.paused=!this.paused; this.cameras.main.setAlpha(this.paused?0.6:1); },
     onGameOver: function(){ this.cameras.main.shake(220,0.01); this.cameras.main.flash(180,255,0,0); this.paused=true; if(this.score>this.hiscore){ setHi(this.score); this.hiscore=this.score; } this.add.text(this.scale.width/2, this.scale.height/2, 'GAME OVER\nPress Restart', {fontFamily:'monospace',fontSize:28,color:'#fff',align:'center'}).setOrigin(0.5); }
   });
 
+  // 既存：W,H はそのまま（W = COLS*CELL, H = VISIBLE_ROWS*CELL）
+  // Phaser起動部の config を以下に置換（Scale.NONEで固定ピクセル）
   var config = {
     type: Phaser.AUTO,
     parent: 'game',
-    width: Math.max(360, COLS*CELL+220),
-    height: Math.max(480, VISIBLE_ROWS*CELL+40),
+    width: W,
+    height: H,
     backgroundColor: '#0b0b0e',
     scene: [GameScene],
-    scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH},
+    scale: { mode: Phaser.Scale.NONE },   // ← 固定サイズ
     fps: { target: 60, forceSetTimeOut: true },
     input: { gamepad: true }
   };
