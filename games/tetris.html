@@ -47,7 +47,7 @@
       </div>
       <div class="panel">
         <div class="label">NEXT</div>
-        <canvas id="nextCanvas" width="96" height="96"></canvas>
+        <canvas id="nextCanvas" width="136" height="136"></canvas>
       </div>
       <div class="panel">
         <button class="btn wide" id="btnRestart2">↻ Reset</button>
@@ -292,31 +292,47 @@
       this.drawPiece(this.activeG, this.cur, this.cur.y-2, 1.0, false, true);
     },
     drawPiece: function(g, piece, oy, alpha, dashed, glow){ for(var i=0;i<piece.pts.length;i++){ var p=piece.pts[i]; var x=piece.x+p[0], y=oy+p[1]; if(y<0) continue; this.drawCell(g, x, y, piece.c, alpha, dashed, glow); } },
-    drawCell: function(g, x, y, color, alpha, dashed, glow){ if(alpha===undefined) alpha=1; if(dashed===undefined) dashed=false; if(glow===undefined) glow=false; var px=x*CELL, py=y*CELL; var c=color; g.fillStyle(Phaser.Display.Color.IntegerToColor(c).darken(25).color, alpha).fillRoundedRect(px+1,py+1,CELL-2,CELL-2,5); g.fillStyle(c, alpha).fillRoundedRect(px+3,py+3,CELL-6,CELL-6,4); g.lineStyle(2, 0xffffff, 0.35*alpha).strokeRoundedRect(px+3,py+3,CELL-6,CELL-6,4); if(glow){ g.lineStyle(3, c, 0.3*alpha).strokeRoundedRect(px+1,py+1,CELL-2,CELL-2,5); } if(dashed){ g.lineStyle(1, 0xffffff, 0.15).strokeRect(px+4,py+4,CELL-8,CELL-8); } },
+    drawCell: function(g, x, y, color, alpha, dashed, glow, cellSize){
+      if(alpha===undefined) alpha=1; if(dashed===undefined) dashed=false; if(glow===undefined) glow=false;
+      var S = cellSize || CELL;
+      var px=x*S, py=y*S; var c=color;
+      g.fillStyle(Phaser.Display.Color.IntegerToColor(c).darken(25).color, alpha).fillRoundedRect(px+1,py+1,S-2,S-2,5);
+      g.fillStyle(c, alpha).fillRoundedRect(px+3,py+3,S-6,S-6,4);
+      g.lineStyle(2, 0xffffff, 0.35*alpha).strokeRoundedRect(px+3,py+3,S-6,S-6,4);
+      if(glow){ g.lineStyle(3, c, 0.3*alpha).strokeRoundedRect(px+1,py+1,S-2,S-2,5); }
+      if(dashed){ g.lineStyle(1, 0xffffff, 0.15).strokeRect(px+4,py+4,S-8,S-8); }
+    },
     updateHUD: function(){
       document.getElementById('uiScore').textContent = this.score + ' / HI ' + Math.max(this.hiscore,this.score);
       document.getElementById('uiLevel').textContent = this.level;
     },
     drawNextPreview: function(piece){
-      var cvs = document.getElementById('nextCanvas');
-      if(!cvs) return;
-      var ctx = cvs.getContext('2d');
-      ctx.clearRect(0,0,cvs.width,cvs.height);
+      var cvs = document.getElementById('nextCanvas'); if(!cvs) return;
+      var ctx = cvs.getContext('2d'); ctx.clearRect(0,0,cvs.width,cvs.height);
       if(!piece) return;
-      // ミノを中央寄せで描く（CELLの半分サイズでプレビュー）
-      var s = Math.floor(CELL * 0.9);
-      var off = Math.floor((cvs.width - 4*s)/2);
-      ctx.fillStyle = '#fff';
-      for(var i=0;i<piece.pts.length;i++){
-        var p = piece.pts[i];
-        var x = off + p[0]*s, y = off + p[1]*s;
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle = '#000';
-        ctx.fillRect(x+2,y+2,s,s);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = '#'+('000000'+TETROS[piece.k].c.toString(16)).slice(-6);
-        ctx.fillRect(x,y,s,s);
+      // 1) ピースの外接矩形
+      var minx=99,miny=99,maxx=-99,maxy=-99,i,p;
+      for(i=0;i<piece.pts.length;i++){ p=piece.pts[i];
+        if(p[0]<minx)minx=p[0]; if(p[0]>maxx)maxx=p[0];
+        if(p[1]<miny)miny=p[1]; if(p[1]>maxy)maxy=p[1];
       }
+      // 2) 表示セルサイズ（CELLに追従）と生成サイズ
+      var S = Math.max(12, Math.floor(CELL * 0.9));
+      var w = (maxx-minx+1)*S, h = (maxy-miny+1)*S;
+      // 3) PhaserのGraphicsに「本体と同じ drawCell」で描く（オフスクリーン）
+      var g = this.make.graphics({x:0,y:0, add:false});
+      for(i=0;i<piece.pts.length;i++){ p=piece.pts[i];
+        // 左上原点に揃えて描画（minx/minyで正規化）
+        this.drawCell(g, p[0]-minx, p[1]-miny, TETROS[piece.k].c, 1.0, false, true, S);
+      }
+      var key='__next';
+      g.generateTexture(key, w, h);
+      var img = this.textures.get(key).getSourceImage();
+      // 4) NEXTキャンバス中央に転送
+      var dx = Math.floor((cvs.width  - w)/2);
+      var dy = Math.floor((cvs.height - h)/2);
+      ctx.drawImage(img, dx, dy);
+      this.textures.remove(key); g.destroy();
     },
     togglePause: function(){ this.paused=!this.paused; this.cameras.main.setAlpha(this.paused?0.6:1); },
     onGameOver: function(){ this.cameras.main.shake(220,0.01); this.cameras.main.flash(180,255,0,0); this.paused=true; if(this.score>this.hiscore){ setHi(this.score); this.hiscore=this.score; } this.add.text(this.scale.width/2, this.scale.height/2, 'GAME OVER\nPress Restart', {fontFamily:'monospace',fontSize:28,color:'#fff',align:'center'}).setOrigin(0.5); }
