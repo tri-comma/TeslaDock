@@ -201,8 +201,27 @@
       this.drawNextPreview(this.peek);
       if(this.collide(this.cur, this.cur.x, this.cur.y)){ this.gameOver=true; this.onGameOver(); }
     },
-    clearLines: function(){ var cleared=0; for(var y=ROWS-1;y>=2;y--){ var full=true; for(var x=0;x<COLS;x++){ if(!this.grid[y][x]){full=false;break;} } if(full){ this.grid.splice(y,1); this.grid.unshift(new Array(COLS).fill(null)); cleared++; y++; } }
-      if(cleared>0){ var bonus=[0,100,300,500,800][cleared]|| (800+(cleared-4)*400); this.score += bonus * this.level; this.lines += cleared; var newLevel = 1 + Math.floor(this.lines/5); if(newLevel>this.level){ this.level=newLevel; this.dropMS = Math.max(80, 900 - (this.level-1)*60); this.cameras.main.flash(120,255,255,255); } this.emitLineParticles(); this.cameras.main.shake(100, 0.006); this.updateHUD(); }
+    emptyRow: function(){
+      var row = new Array(COLS);
+      for (var x=0; x<COLS; x++) row[x] = null;
+      return row;
+    },
+    clearLines: function(){
+      var cleared = 0;
+      var y = ROWS - 1;
+      while (y >= 2) {
+        var full = true;
+        for (var x = 0; x < COLS; x++) { if (!this.grid[y][x]) { full = false; break; } }
+        if (full) {
+          this.grid.splice(y, 1);
+          this.grid.unshift(this.emptyRow());
+          cleared++;
+          // yは据え置き：落ちてきた同じインデックスの行を再評価
+        } else {
+          y--;
+        }
+      }
+      if (cleared > 0) { /* 既存のスコア/演出更新はそのまま */ }
     },
     emitLineParticles: function(){ var e = this.particles.createEmitter({ x:this.board.x+W/2, y:this.board.y+H-2, speed:{min:80,max:160}, angle:{min:260,max:280}, gravityY:400, lifespan:600, quantity:40, scale:{start:0.8,end:0}, tint:0xffffff, blendMode:'ADD' }); this.time.delayedCall(300, function(){e.stop();}); },
     hardDrop: function(){ var y=this.cur.y; while(!this.collide(this.cur, this.cur.x, y+1)) y++; this.cur.y=y; this.lock(); this.score+=2; this.updateHUD(); },
